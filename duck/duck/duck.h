@@ -9,6 +9,13 @@ namespace mini
 		{
 		public:
 			explicit Duck(HINSTANCE hInst);
+
+		protected:
+			void update(utils::clock const& clock) override;
+			void updateWater();
+
+		private:
+			static constexpr UINT N = 256;
 		};
 	}
 }

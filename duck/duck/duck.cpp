@@ -40,6 +40,11 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst)
 	//Textures
 	m_variables.AddSampler(m_device, "samp");
 	m_variables.AddTexture(m_device, "envMap", L"textures/cubeMap.dds");
+	tex2d_info bump(N, N);
+	bump.Usage = D3D11_USAGE_DYNAMIC;
+	bump.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	bump.MipLevels = 1;
+	m_variables.AddTexture(m_device, "bumpMap", bump);
 
 	//Render Passes
 	auto passEnv = addPass(L"envVS.cso", L"envPS.cso");
@@ -52,4 +57,39 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst)
 	rs.CullMode = D3D11_CULL_NONE;
 	addRasterizerState(passWater, rs);
 
+}
+
+void Duck::update(utils::clock const& clock)
+{
+	DuckBase::update(clock);
+	updateWater();
+}
+
+void Duck::updateWater()
+{
+	auto& bumpMap = m_variables.GetTexture("bumpMap");
+	ID3D11Resource* resource;
+	bumpMap.get()->GetResource(&resource);
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	HRESULT hr = m_device.context()->Map(resource, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	if (FAILED(hr))
+		throw utils::winapi_error{ hr };
+
+	uint8_t* pData = reinterpret_cast<uint8_t*>(mappedResource.pData);
+	for (UINT y = 0; y < N; y++)
+	{
+		uint8_t* pRow = pData + y * mappedResource.RowPitch;
+		for (UINT x = 0; x < N; x++)
+		{
+			uint8_t* pPixel = pRow + x * 4;
+
+			pPixel[0] = 128;
+			pPixel[1] = 255;
+			pPixel[2] = 128;
+			pPixel[3] = 0;
+		}
+	}
+
+	// Unmap the texture
+	m_device.context()->Unmap(resource, 0);
 }
