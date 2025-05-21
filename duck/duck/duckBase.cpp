@@ -113,7 +113,7 @@ protected:
 };
 
 DuckBase::DuckBase(HINSTANCE hInst)
-	: dx_app(hInst, 1280, 720, L"Shader Demo"), m_loader(m_device), m_layouts(m_device), m_camera(0.01f, 50.0f, 5),
+	: dx_app(hInst, 1280, 720, L"D.U.C.K."), m_loader(m_device), m_layouts(m_device), m_camera(0.01f, 50.0f, 50.0f),
 	  m_frustrum(get_window().client_size(), XM_PIDIV4, 0.5f, 85.0f), m_gui(m_device, get_window())
 {
 }
