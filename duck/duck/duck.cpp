@@ -37,6 +37,10 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	model(quad).applyTransform(modelMtx);
 	model(envModel).applyTransform(modelMtx);
 
+	auto duck = addModelFromFile("models/duck.txt");
+	XMStoreFloat4x4(&modelMtx, XMMatrixIdentity());
+	model(duck).applyTransform(modelMtx);
+
 	//Textures
 	m_variables.AddSampler(m_device, "samp");
 	m_variables.AddTexture(m_device, "envMap", L"textures/cubeMap.dds");
@@ -45,6 +49,7 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	bump.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	bump.MipLevels = 1;
 	m_variables.AddTexture(m_device, "bumpMap", bump);
+	m_variables.AddTexture(m_device, "duckTex", L"textures/ducktex.jpg");
 
 	//Render Passes
 	auto passEnv = addPass(L"envVS.cso", L"envPS.cso");
