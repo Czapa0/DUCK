@@ -16,15 +16,14 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	m_variables.AddSemanticVariable("camPos", VariableSemantic::Vec4CamPos);
 	m_variables.AddSemanticVariable("mvpMtx", VariableSemantic::MatMVP);
 
-	XMFLOAT4 lightPos = { -1.f, 0.0f, -3.5f, 1.f };
-	XMFLOAT3 lightColor = { 12.f, 9.f, 10.f };
+	XMFLOAT4 lightPos = { 0.f, 5.0f, 0.f, 1.f };
+	XMFLOAT3 lightColor = { 3.f, 3.f, 3.f };
 	m_variables.AddGuiVariable("lightPos", lightPos, -10, 10);
-	m_variables.AddGuiVariable("lightColor", lightColor, 0, 100, 1);
-	m_variables.AddGuiColorVariable("surfaceColor", XMFLOAT3{ 0.5f, 1.0f, 0.8f });
-	m_variables.AddGuiVariable("ks", 0.8f);
-	m_variables.AddGuiVariable("kd", 0.5f);
+	m_variables.AddGuiVariable("lightColor", lightColor, 0, 10, 1);
+	m_variables.AddGuiVariable("ks", 0.1f);
+	m_variables.AddGuiVariable("kd", 0.7f);
 	m_variables.AddGuiVariable("ka", 0.2f);
-	m_variables.AddGuiVariable("m", 1.f, 0.1f, 200.f);
+	m_variables.AddGuiVariable("m", 10.f, 0.1f, 200.f);
 
 	m_variables.AddGuiVariable("waterLevel", -0.05f, -1, 1, 0.001f);
 	m_variables.AddGuiVariable("drops", 0.04f, 0.f, 1.f, 0.001f);
@@ -37,8 +36,8 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	model(quad).applyTransform(modelMtx);
 	model(envModel).applyTransform(modelMtx);
 
-	auto duck = addModelFromFile("models/duck.txt");
-	XMStoreFloat4x4(&modelMtx, XMMatrixIdentity());
+	auto duck = addModelFromFile("models/duck.obj");
+	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f));
 	model(duck).applyTransform(modelMtx);
 
 	//Textures
@@ -61,6 +60,9 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	rasterizer_info rs;
 	rs.CullMode = D3D11_CULL_NONE;
 	addRasterizerState(passWater, rs);
+
+	auto passDuck = addPass(L"duckVS.cso", L"duckPS.cso");
+	addModelToPass(passDuck, duck);
 
 	//Other
 	calculateDamping();
