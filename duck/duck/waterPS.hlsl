@@ -28,7 +28,8 @@ float fresnel(float3 N, float3 V)
 
 float4 main(PSInput i) : SV_TARGET
 {   
-    float3 norm = bumpMap.Sample(samp, i.localPos.xz).rgb;
+    float2 tex = (i.localPos.xz + 1.0) / 2.0;
+    float3 norm = bumpMap.Sample(samp, tex).rgb;
     norm = normalize(norm * 2.0 - 1.0);
     float3 viewVec = normalize(camPos.xyz - i.worldPos);
     float n = 3.0 / 4.0;

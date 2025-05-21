@@ -7,7 +7,7 @@ using namespace std;
 using namespace directx;
 using namespace utils;
 
-Duck::Duck(HINSTANCE hInst): DuckBase(hInst)
+Duck::Duck(HINSTANCE hInst): DuckBase(hInst), z1(), z2(), d()
 {
 	//Shader Variables
 	m_variables.AddSemanticVariable("modelMtx", VariableSemantic::MatM);
@@ -36,7 +36,6 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst)
 	model(quad).applyTransform(modelMtx);
 	model(envModel).applyTransform(modelMtx);
 
-
 	//Textures
 	m_variables.AddSampler(m_device, "samp");
 	m_variables.AddTexture(m_device, "envMap", L"textures/cubeMap.dds");
@@ -57,24 +56,31 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst)
 	rs.CullMode = D3D11_CULL_NONE;
 	addRasterizerState(passWater, rs);
 
+	//Other
+	calculateDamping();
 }
 
 void Duck::update(utils::clock const& clock)
 {
 	DuckBase::update(clock);
+	updateBumps();
 	updateWater();
 }
 
 void Duck::updateWater()
 {
+	//Load bump map
 	auto& bumpMap = m_variables.GetTexture("bumpMap");
 	ID3D11Resource* resource;
 	bumpMap.get()->GetResource(&resource);
+
+	//Map resource
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
 	HRESULT hr = m_device.context()->Map(resource, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 	if (FAILED(hr))
 		throw utils::winapi_error{ hr };
 
+	//Update map
 	uint8_t* pData = reinterpret_cast<uint8_t*>(mappedResource.pData);
 	for (UINT y = 0; y < N; y++)
 	{
@@ -83,13 +89,40 @@ void Duck::updateWater()
 		{
 			uint8_t* pPixel = pRow + x * 4;
 
-			pPixel[0] = 128;
-			pPixel[1] = 255;
-			pPixel[2] = 128;
+			//Calculate normal
+			XMVECTOR dx = { 2.f * h, z1[x + 2][y + 1] - z1[x][y + 1], 0.f };
+			XMVECTOR dz = { 0.f, z1[x + 1][y] - z1[x + 1][y + 2], 2.f * h };
+			XMVECTOR normal = XMVector3Normalize(XMVector3Cross(dx, dz));
+
+			//Encode normal
+			pPixel[0] = static_cast<uint8_t>(std::clamp((XMVectorGetX(normal) + 1.f) / 2.f * 255.f, 0.f, 255.f));
+			pPixel[1] = static_cast<uint8_t>(std::clamp((XMVectorGetY(normal) + 1.f) / 2.f * 255.f, 0.f, 255.f));
+			pPixel[2] = static_cast<uint8_t>(std::clamp((XMVectorGetZ(normal) + 1.f) / 2.f * 255.f, 0.f, 255.f));
 			pPixel[3] = 0;
 		}
 	}
 
-	// Unmap the texture
+	//Unmap the map
 	m_device.context()->Unmap(resource, 0);
+}
+
+void Duck::calculateDamping()
+{
+	for (UINT i = 0; i < N; i++) {
+		for (UINT j = 0; j < N; j++) {
+			float l = min({ i,N - i,j,N - j }) * h;
+			d[i][j] = 0.95f * min(1.f, l / 0.2f);
+		}
+	}
+}
+
+void Duck::updateBumps()
+{
+	for (UINT i = 1; i <= N; i++) {
+		for (UINT j = 1; j <= N; j++) {
+			z2[i][j] = d[i - 1][j - 1] * (A * (z1[i + 1][j] + z1[i - 1][j] + z1[i][j - 1] + z1[i][j + 1]) + B * z1[i][j] - z2[i][j]);
+		}
+	}
+
+	std::swap(z1, z2);
 }
