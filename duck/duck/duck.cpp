@@ -128,8 +128,6 @@ void Duck::updateDuck()
 	//Update control points
 	if (m_time > BSPLINE_SEGMENT_TIME)
 	{
-		//modf(m_time / BSPLINE_SEGMENT_TIME, &m_time);
-		//m_time *= BSPLINE_SEGMENT_TIME;
 		while (m_time > BSPLINE_SEGMENT_TIME)
 			m_time -= BSPLINE_SEGMENT_TIME;
 		m_controlPoints.pop_front();
@@ -138,12 +136,20 @@ void Duck::updateDuck()
 
 	//Calculate new position
 	float t = m_time / BSPLINE_SEGMENT_TIME; //normalized to [0,1]
-	m_duckPos = evaluateCubicBSpline(t);
+	XMVECTOR pos = evaluateCubicBSpline(t);
+
+	//Calculate rotation
+	XMVECTOR tangent = evaluateCubicBSplineTangent(t);
+	float angle = XMVectorGetX(XMVector3AngleBetweenNormals({ -1,0,0 }, tangent));
+	XMVECTOR axis = XMVector3Cross({ -1,0,0 }, tangent);
+	if (XMVectorGetX(XMVector3LengthSq(axis)) == 0.f)
+		axis = { 0,1,0 };
+	XMMATRIX R = XMMatrixRotationAxis(axis, angle);
 	
 	//Update model
 	auto& duck = model(m_duck);
 	XMFLOAT4X4 modelMtx;
-	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f) * XMMatrixTranslationFromVector(20.0f * m_duckPos));
+	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f) * R * XMMatrixTranslationFromVector(20.0f * pos));
 	duck.setTransform(modelMtx);
 }
 
@@ -197,4 +203,22 @@ XMVECTOR Duck::evaluateCubicBSpline(float t)
 	float w3 = t * t * t * scale;
 
 	return w0 * m_controlPoints[0] + w1 * m_controlPoints[1] + w2 * m_controlPoints[2] + w3 * m_controlPoints[3];
+}
+
+DirectX::XMVECTOR Duck::evaluateCubicBSplineTangent(float t)
+{
+	float t2 = t * t;
+
+	float b0 = -0.5f * (1.0f - t) * (1.0f - t);
+	float b1 = 1.5f * t2 - 2.0f * t;
+	float b2 = -1.5f * t2 + t + 0.5f;
+	float b3 = 0.5f * t2;
+
+	XMVECTOR tangent =
+		m_controlPoints[0] * b0 +
+		m_controlPoints[1] * b1 +
+		m_controlPoints[2] * b2 +
+		m_controlPoints[3] * b3;
+
+	return XMVector3Normalize(tangent);
 }

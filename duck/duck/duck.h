@@ -22,6 +22,7 @@ namespace mini
 
 			void addNewControlPoint();
 			DirectX::XMVECTOR evaluateCubicBSpline(float t);
+			DirectX::XMVECTOR evaluateCubicBSplineTangent(float t);
 
 		private:
 			static constexpr UINT N = 256;
@@ -34,7 +35,6 @@ namespace mini
 			static constexpr float BSPLINE_SEGMENT_TIME = 1.f;
 
 			size_t m_duck;
-			DirectX::XMVECTOR m_duckPos;
 			float m_time = 0.f;
 			std::deque<DirectX::XMVECTOR> m_controlPoints;
 
