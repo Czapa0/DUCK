@@ -151,6 +151,11 @@ void Duck::updateDuck()
 	XMFLOAT4X4 modelMtx;
 	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f) * R * XMMatrixTranslationFromVector(20.0f * pos));
 	duck.setTransform(modelMtx);
+
+	//Water distortion
+	int i = static_cast<int>((XMVectorGetX(pos) + 1.f) / 2.f * N) + 1;
+	int j = static_cast<int>((XMVectorGetZ(pos) + 1.f) / 2.f * N) + 1;
+	m_z1[i][j] = 0.1f;
 }
 
 void Duck::calculateDamping()

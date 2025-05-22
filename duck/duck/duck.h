@@ -31,7 +31,7 @@ namespace mini
 			static constexpr float dt = 1.f / N;
 			static constexpr float A = c * c * dt * dt / (h * h);
 			static constexpr float B = 2.f - 4.f * A;
-			static constexpr std::pair<float, float> BUMP_RANGE = { 0.1f, 0.2f };
+			static constexpr std::pair<float, float> BUMP_RANGE = { 0.05f, 0.1f };
 			static constexpr float BSPLINE_SEGMENT_TIME = 1.f;
 
 			size_t m_duck;

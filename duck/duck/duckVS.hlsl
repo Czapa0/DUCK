@@ -1,5 +1,6 @@
 matrix modelMtx, modelInvTMtx, viewProjMtx;
 float4 camPos;
+float waterLevel;
 
 struct VSInput
 {
@@ -21,6 +22,7 @@ VSOutput main(VSInput i)
 {
     VSOutput o;
     float4 worldPos = mul(modelMtx, float4(i.pos, 1.0f));
+    worldPos.y += 20.f * waterLevel;
     o.view = normalize(camPos.xyz - worldPos.xyz);
     o.norm = normalize(mul(modelInvTMtx, float4(i.norm, 0.0f)).xyz);
     o.worldPos = worldPos.xyz;
