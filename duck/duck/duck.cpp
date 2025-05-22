@@ -36,9 +36,9 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	model(quad).applyTransform(modelMtx);
 	model(envModel).applyTransform(modelMtx);
 
-	auto duck = addModelFromFile("models/duck.obj");
+	m_duck = addModelFromFile("models/duck.obj");
 	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f));
-	model(duck).applyTransform(modelMtx);
+	model(m_duck).applyTransform(modelMtx);
 
 	//Textures
 	m_variables.AddSampler(m_device, "samp");
@@ -62,18 +62,26 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	addRasterizerState(passWater, rs);
 
 	auto passDuck = addPass(L"duckVS.cso", L"duckPS.cso");
-	addModelToPass(passDuck, duck);
+	addModelToPass(passDuck, m_duck);
 
-	//Other
+	//Water init
 	calculateDamping();
+
+	//BSpline
+	for (int i = 0; i < 4; i++)
+	{
+		addNewControlPoint();
+	}
 }
 
 void Duck::update(utils::clock const& clock)
 {
 	DuckBase::update(clock);
+	m_time += clock.frame_time();
 	spawnDrop();
 	updateBumps();
 	updateWater();
+	updateDuck();
 }
 
 void Duck::updateWater()
@@ -115,6 +123,30 @@ void Duck::updateWater()
 	m_device.context()->Unmap(resource, 0);
 }
 
+void Duck::updateDuck()
+{
+	//Update control points
+	if (m_time > BSPLINE_SEGMENT_TIME)
+	{
+		//modf(m_time / BSPLINE_SEGMENT_TIME, &m_time);
+		//m_time *= BSPLINE_SEGMENT_TIME;
+		while (m_time > BSPLINE_SEGMENT_TIME)
+			m_time -= BSPLINE_SEGMENT_TIME;
+		m_controlPoints.pop_front();
+		addNewControlPoint();
+	}
+
+	//Calculate new position
+	float t = m_time / BSPLINE_SEGMENT_TIME; //normalized to [0,1]
+	m_duckPos = evaluateCubicBSpline(t);
+	
+	//Update model
+	auto& duck = model(m_duck);
+	XMFLOAT4X4 modelMtx;
+	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f) * XMMatrixTranslationFromVector(20.0f * m_duckPos));
+	duck.setTransform(modelMtx);
+}
+
 void Duck::calculateDamping()
 {
 	for (UINT i = 0; i < N; i++) {
@@ -147,4 +179,22 @@ void Duck::spawnDrop()
 		float height = m_spawnHeight(m_randomGen);
 		m_z1[i][j] = height;
 	}
+}
+
+void Duck::addNewControlPoint()
+{
+	float x = m_controlPointPosition(m_randomGen);
+	float z = m_controlPointPosition(m_randomGen);
+	m_controlPoints.push_back({ x,0.f,z,0.f });
+}
+
+XMVECTOR Duck::evaluateCubicBSpline(float t)
+{
+	float scale = 1.f / 6.f;
+	float w0 = (((-t + 3.f) * t - 3.f) * t + 1.f) * scale;
+	float w1 = (((3.f * t - 6.f) * t + 0.f) * t + 4.f) * scale;
+	float w2 = (((-3.f * t + 3.f) * t + 3.f) * t + 1.f) * scale;
+	float w3 = t * t * t * scale;
+
+	return w0 * m_controlPoints[0] + w1 * m_controlPoints[1] + w2 * m_controlPoints[2] + w3 * m_controlPoints[3];
 }
