@@ -150,6 +150,19 @@ void Model::applyTransform(const DirectX::XMFLOAT4X4& transform)
 	}
 }
 
+void Model::setTransform(const DirectX::XMFLOAT4X4& transform)
+{
+	if (m_nodes.empty())
+		return;
+	int currentIndex = 0;
+	while (currentIndex != -1)
+	{
+		ModelNode& currentNode = m_nodes[currentIndex];
+		XMStoreFloat4x4(&currentNode.localTransform, XMLoadFloat4x4(&transform));
+		currentIndex = currentNode.nextIndex;
+	}
+}
+
 Model::NodeIterator Model::begin() const
 {
 	return NodeIterator(*this);

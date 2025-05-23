@@ -82,6 +82,7 @@ namespace mini
 		void setNodeTransform(int nodeIndex, const DirectX::XMFLOAT4X4& transform);
 		//applies transformation to the whole model
 		void applyTransform(const DirectX::XMFLOAT4X4& transform);
+		void setTransform(const DirectX::XMFLOAT4X4& transform);
 
 		NodeIterator begin() const;
 		NodeIterator end() const;

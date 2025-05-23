@@ -16,15 +16,14 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	m_variables.AddSemanticVariable("camPos", VariableSemantic::Vec4CamPos);
 	m_variables.AddSemanticVariable("mvpMtx", VariableSemantic::MatMVP);
 
-	XMFLOAT4 lightPos = { -1.f, 0.0f, -3.5f, 1.f };
-	XMFLOAT3 lightColor = { 12.f, 9.f, 10.f };
-	m_variables.AddGuiVariable("lightPos", lightPos, -10, 10);
-	m_variables.AddGuiVariable("lightColor", lightColor, 0, 100, 1);
-	m_variables.AddGuiColorVariable("surfaceColor", XMFLOAT3{ 0.5f, 1.0f, 0.8f });
-	m_variables.AddGuiVariable("ks", 0.8f);
-	m_variables.AddGuiVariable("kd", 0.5f);
+	XMFLOAT3 lightDir = { 0.f, -1.0f, 0.f };
+	XMFLOAT3 lightColor = { 3.f, 3.f, 3.f };
+	m_variables.AddGuiVariable("lightDir", lightDir, -10, 10);
+	m_variables.AddGuiVariable("lightColor", lightColor, 0, 10, 1);
+	m_variables.AddGuiVariable("ks", 0.1f);
+	m_variables.AddGuiVariable("kd", 0.7f);
 	m_variables.AddGuiVariable("ka", 0.2f);
-	m_variables.AddGuiVariable("m", 1.f, 0.1f, 200.f);
+	m_variables.AddGuiVariable("m", 10.f, 0.1f, 200.f);
 
 	m_variables.AddGuiVariable("waterLevel", -0.05f, -1, 1, 0.001f);
 	m_variables.AddGuiVariable("drops", 0.04f, 0.f, 1.f, 0.001f);
@@ -37,6 +36,10 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	model(quad).applyTransform(modelMtx);
 	model(envModel).applyTransform(modelMtx);
 
+	m_duck = addModelFromFile("models/duck.obj");
+	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f));
+	model(m_duck).applyTransform(modelMtx);
+
 	//Textures
 	m_variables.AddSampler(m_device, "samp");
 	m_variables.AddTexture(m_device, "envMap", L"textures/cubeMap.dds");
@@ -45,6 +48,7 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	bump.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	bump.MipLevels = 1;
 	m_variables.AddTexture(m_device, "bumpMap", bump);
+	m_variables.AddTexture(m_device, "duckTex", L"textures/ducktex.jpg");
 
 	//Render Passes
 	auto passEnv = addPass(L"envVS.cso", L"envPS.cso");
@@ -57,16 +61,27 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	rs.CullMode = D3D11_CULL_NONE;
 	addRasterizerState(passWater, rs);
 
-	//Other
+	auto passDuck = addPass(L"duckVS.cso", L"duckPS.cso");
+	addModelToPass(passDuck, m_duck);
+
+	//Water init
 	calculateDamping();
+
+	//BSpline
+	for (int i = 0; i < 4; i++)
+	{
+		addNewControlPoint();
+	}
 }
 
 void Duck::update(utils::clock const& clock)
 {
 	DuckBase::update(clock);
+	m_time += clock.frame_time();
 	spawnDrop();
 	updateBumps();
 	updateWater();
+	updateDuck();
 }
 
 void Duck::updateWater()
@@ -108,6 +123,41 @@ void Duck::updateWater()
 	m_device.context()->Unmap(resource, 0);
 }
 
+void Duck::updateDuck()
+{
+	//Update control points
+	if (m_time > BSPLINE_SEGMENT_TIME)
+	{
+		while (m_time > BSPLINE_SEGMENT_TIME)
+			m_time -= BSPLINE_SEGMENT_TIME;
+		m_controlPoints.pop_front();
+		addNewControlPoint();
+	}
+
+	//Calculate new position
+	float t = m_time / BSPLINE_SEGMENT_TIME; //normalized to [0,1]
+	XMVECTOR pos = evaluateCubicBSpline(t);
+
+	//Calculate rotation
+	XMVECTOR tangent = evaluateCubicBSplineTangent(t);
+	float angle = XMVectorGetX(XMVector3AngleBetweenNormals({ -1,0,0 }, tangent));
+	XMVECTOR axis = XMVector3Cross({ -1,0,0 }, tangent);
+	if (XMVectorGetX(XMVector3LengthSq(axis)) == 0.f)
+		axis = { 0,1,0 };
+	XMMATRIX R = XMMatrixRotationAxis(axis, angle);
+	
+	//Update model
+	auto& duck = model(m_duck);
+	XMFLOAT4X4 modelMtx;
+	XMStoreFloat4x4(&modelMtx, XMMatrixScaling(5e-2f, 5e-2f, 5e-2f) * R * XMMatrixTranslationFromVector(20.0f * pos));
+	duck.setTransform(modelMtx);
+
+	//Water distortion
+	int i = static_cast<int>((XMVectorGetX(pos) + 1.f) / 2.f * N) + 1;
+	int j = static_cast<int>((XMVectorGetZ(pos) + 1.f) / 2.f * N) + 1;
+	m_z1[i][j] = 0.1f;
+}
+
 void Duck::calculateDamping()
 {
 	for (UINT i = 0; i < N; i++) {
@@ -140,4 +190,40 @@ void Duck::spawnDrop()
 		float height = m_spawnHeight(m_randomGen);
 		m_z1[i][j] = height;
 	}
+}
+
+void Duck::addNewControlPoint()
+{
+	float x = m_controlPointPosition(m_randomGen);
+	float z = m_controlPointPosition(m_randomGen);
+	m_controlPoints.push_back({ x,0.f,z,0.f });
+}
+
+XMVECTOR Duck::evaluateCubicBSpline(float t)
+{
+	float scale = 1.f / 6.f;
+	float w0 = (((-t + 3.f) * t - 3.f) * t + 1.f) * scale;
+	float w1 = (((3.f * t - 6.f) * t + 0.f) * t + 4.f) * scale;
+	float w2 = (((-3.f * t + 3.f) * t + 3.f) * t + 1.f) * scale;
+	float w3 = t * t * t * scale;
+
+	return w0 * m_controlPoints[0] + w1 * m_controlPoints[1] + w2 * m_controlPoints[2] + w3 * m_controlPoints[3];
+}
+
+DirectX::XMVECTOR Duck::evaluateCubicBSplineTangent(float t)
+{
+	float t2 = t * t;
+
+	float b0 = -0.5f * (1.0f - t) * (1.0f - t);
+	float b1 = 1.5f * t2 - 2.0f * t;
+	float b2 = -1.5f * t2 + t + 0.5f;
+	float b3 = 0.5f * t2;
+
+	XMVECTOR tangent =
+		m_controlPoints[0] * b0 +
+		m_controlPoints[1] * b1 +
+		m_controlPoints[2] * b2 +
+		m_controlPoints[3] * b3;
+
+	return XMVector3Normalize(tangent);
 }
