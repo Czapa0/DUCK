@@ -16,9 +16,9 @@ Duck::Duck(HINSTANCE hInst): DuckBase(hInst), m_z1(), m_z2(), m_d(), m_randomGen
 	m_variables.AddSemanticVariable("camPos", VariableSemantic::Vec4CamPos);
 	m_variables.AddSemanticVariable("mvpMtx", VariableSemantic::MatMVP);
 
-	XMFLOAT4 lightPos = { 0.f, 5.0f, 0.f, 1.f };
+	XMFLOAT3 lightDir = { 0.f, -1.0f, 0.f };
 	XMFLOAT3 lightColor = { 3.f, 3.f, 3.f };
-	m_variables.AddGuiVariable("lightPos", lightPos, -10, 10);
+	m_variables.AddGuiVariable("lightDir", lightDir, -10, 10);
 	m_variables.AddGuiVariable("lightColor", lightColor, 0, 10, 1);
 	m_variables.AddGuiVariable("ks", 0.1f);
 	m_variables.AddGuiVariable("kd", 0.7f);
